@@ -6,6 +6,7 @@ import { useEffect } from 'react';
 import 'react-native-reanimated';
 
 import { useColorScheme } from '@/hooks/useColorScheme';
+import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
 
 // Prevent the splash screen from auto-hiding before asset loading is complete.
 SplashScreen.preventAutoHideAsync();
@@ -15,6 +16,8 @@ export default function RootLayout() {
   const [loaded] = useFonts({
     SpaceMono: require('../assets/fonts/SpaceMono-Regular.ttf'),
   });
+
+  const { top, bottom, right, left } = useSafeAreaInsets();
 
   useEffect(() => {
     if (loaded) {
@@ -28,10 +31,12 @@ export default function RootLayout() {
 
   return (
     <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-      <Stack>
-        <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-        <Stack.Screen name="+not-found" />
-      </Stack>
+      <SafeAreaProvider style={{ paddingTop: top, paddingBottom: bottom, paddingRight: right, paddingLeft: left }}>
+        <Stack initialRouteName='index' screenOptions={{ headerShown: false }}>
+          <Stack.Screen name="index" />
+          <Stack.Screen name="login/login" />
+        </Stack>
+      </SafeAreaProvider>
     </ThemeProvider>
   );
 }
