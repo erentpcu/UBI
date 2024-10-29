@@ -11,6 +11,7 @@ function Connection() {
   const [isScanning, setIsScanning] = useState(false);
   const [devices, setDevices] = useState([]);
   const [isBluetoothReady, setIsBluetoothReady] = useState(false);
+  const [scanStatus, setScanStatus] = useState(''); // Yeni state
 
   const requestBluetoothPermission = async () => {
     if (Platform.OS === 'android') {
@@ -35,22 +36,35 @@ function Connection() {
   useEffect(() => {
     const initializeBluetooth = async () => {
       try {
-        await requestBluetoothPermission();
+        const permissionGranted = await requestBluetoothPermission();
+        if (!permissionGranted) {
+          setScanStatus('Bluetooth izinleri reddedildi');
+          return;
+        }
         
-        // BleManager'ı başlat
         await BleManager.start({ showAlert: false });
-        console.log('BleManager initialized');
         setIsBluetoothReady(true);
 
-        // Bluetooth durumunu kontrol et
+        // Bluetooth durumunu kontrol et ve kapalıysa aç
         const state = await BleManager.checkState();
         if (state !== 'on') {
+          setScanStatus('Bluetooth açılıyor...');
           if (Platform.OS === 'android') {
-            await BleManager.enableBluetooth();
+            try {
+              await BleManager.enableBluetooth();
+              setScanStatus('Bluetooth açıldı');
+            } catch (error) {
+              setScanStatus('Bluetooth açılamadı. Lütfen manuel olarak açın.');
+              return;
+            }
+          } else {
+            setScanStatus('Lütfen Bluetooth\'u açın');
+            return;
           }
         }
       } catch (error) {
         console.error('Initialization error:', error);
+        setScanStatus('Bluetooth başlatılamadı');
       }
     };
 
@@ -79,29 +93,47 @@ function Connection() {
 
   const scanAndConnect = async () => {
     if (!isBluetoothReady) {
-      console.log('Bluetooth is not ready yet');
+      setScanStatus('Bluetooth hazır değil');
       return;
     }
 
     try {
       setDevices([]);
       setIsScanning(true);
+      setScanStatus('OBD2 cihazları aranıyor...');
       
-      await BleManager.scan([], 5, true);
-      console.log('Scanning started...');
+      // OBD2 cihazları için tarama - genellikle OBD-II veya PLX gibi isimler içerir
+      await BleManager.scan([], 10, true);
 
       setTimeout(async () => {
         try {
           await BleManager.stopScan();
-          console.log('Scanning stopped');
           setIsScanning(false);
+          if (devices.length === 0) {
+            setScanStatus('OBD2 cihazı bulunamadı');
+          } else {
+            setScanStatus(`${devices.length} cihaz bulundu`);
+          }
         } catch (error) {
           console.error('Error stopping scan:', error);
         }
-      }, 5000);
+      }, 10000); // 10 saniye tarama
     } catch (error) {
       console.error('Error during scan:', error);
       setIsScanning(false);
+    }
+  };
+
+  // Cihaz bağlantı fonksiyonu
+  const connectToDevice = async (device) => {
+    try {
+      setScanStatus(`${device.name || 'Cihaz'} bağlanıyor...`);
+      await BleManager.connect(device.id);
+      setScanStatus('Bağlantı başarılı!');
+      // Burada OBD2 spesifik karakteristikleri keşfedebilirsiniz
+    } catch (error) {
+      console.error('Connection error:', error);
+      setScanStatus('Bağlantı başarısız');
     }
   };
 
@@ -128,12 +160,22 @@ function Connection() {
           <View style={styles.deviceList}>
             <Text style={styles.deviceListTitle}>Available Devices:</Text>
             {devices.map((device, index) => (
-              <TouchableOpacity key={index} style={styles.deviceButton}>
-                <Text style={styles.deviceButtonText}>{device.name || 'Unnamed Device'}</Text>
+              <TouchableOpacity 
+                key={index} 
+                style={styles.deviceButton}
+                onPress={() => connectToDevice(device)}
+              >
+                <Text style={styles.deviceButtonText}>
+                  {device.name || 'OBD2 Cihazı'} ({device.id})
+                </Text>
               </TouchableOpacity>
             ))}
           </View>
         )}
+        
+        {scanStatus ? (
+          <Text style={styles.statusText}>{scanStatus}</Text>
+        ) : null}
       </View>
     </SafeAreaView>
   );
@@ -227,6 +269,12 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#007AFF',
     marginBottom: 20,
+  },
+  statusText: {
+    fontSize: 16,
+    color: '#333333',
+    marginTop: 10,
+    textAlign: 'center',
   },
 });
 
