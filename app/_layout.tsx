@@ -4,20 +4,54 @@ import { Stack } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { useEffect } from 'react';
 import 'react-native-reanimated';
-
+import { Provider, useSelector } from 'react-redux';
 import { useColorScheme } from '@/hooks/useColorScheme';
 import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { subscribeToAuthChanges } from './secrets/auth';
+import { store } from '../app/store';
+import { loadStoredUser } from './store/authSlice';
 
-// Prevent the splash screen from auto-hiding before asset loading is complete.
 SplashScreen.preventAutoHideAsync();
 
-export default function RootLayout() {
+function AppContent() {
   const colorScheme = useColorScheme();
+  const { top, bottom, right, left } = useSafeAreaInsets();
+  const user = useSelector((state: any) => state.auth.user);
+
+  useEffect(() => {
+    store.dispatch(loadStoredUser());
+    
+    const unsubscribe = subscribeToAuthChanges(() => {});
+
+    return () => unsubscribe();
+  }, []);
+
+  return (
+    <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
+      <SafeAreaProvider style={{ paddingTop: top, paddingBottom: bottom, paddingRight: right, paddingLeft: left }}>
+        <Stack 
+          initialRouteName={user ? 'Connection' : 'login/login'} 
+          screenOptions={{ headerShown: false }}
+        >
+          <Stack.Screen name="index" />
+          <Stack.Screen name="login/login" />
+          <Stack.Screen 
+            name="Connection" 
+            options={{
+              headerShown: false,
+              gestureEnabled: false
+            }}
+          />
+        </Stack>
+      </SafeAreaProvider>
+    </ThemeProvider>
+  );
+}
+
+export default function RootLayout() {
   const [loaded] = useFonts({
     SpaceMono: require('../assets/fonts/SpaceMono-Regular.ttf'),
   });
-
-  const { top, bottom, right, left } = useSafeAreaInsets();
 
   useEffect(() => {
     if (loaded) {
@@ -30,13 +64,8 @@ export default function RootLayout() {
   }
 
   return (
-    <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-      <SafeAreaProvider style={{ paddingTop: top, paddingBottom: bottom, paddingRight: right, paddingLeft: left }}>
-        <Stack initialRouteName='index' screenOptions={{ headerShown: false }}>
-          <Stack.Screen name="index" />
-          <Stack.Screen name="login/login" />
-        </Stack>
-      </SafeAreaProvider>
-    </ThemeProvider>
+    <Provider store={store}>
+      <AppContent />
+    </Provider>
   );
 }

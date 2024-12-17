@@ -3,15 +3,69 @@ import { View, Text, TouchableOpacity, StyleSheet, SafeAreaView, Image, Platform
 import { Feather } from '@expo/vector-icons';
 import BleManager from 'react-native-ble-manager';
 import { NativeEventEmitter, NativeModules, PermissionsAndroid } from 'react-native';
+import { auth, handleSignOut } from './secrets/auth';
+import { useNavigation } from '@react-navigation/native';
+import { useSelector } from 'react-redux';
 
 const BleManagerModule = NativeModules.BleManager;
 const bleManagerEmitter = new NativeEventEmitter(BleManagerModule);
 
 function Connection() {
+  const navigation = useNavigation();
   const [isScanning, setIsScanning] = useState(false);
   const [devices, setDevices] = useState([]);
   const [isBluetoothReady, setIsBluetoothReady] = useState(false);
-  const [scanStatus, setScanStatus] = useState(''); // Yeni state
+  const [scanStatus, setScanStatus] = useState('');
+  const { user } = useSelector(state => state.auth);
+  const [userName, setUserName] = useState('');
+
+  useEffect(() => {
+    if (user) {
+      const name = user.email.split('@')[0];
+      setUserName(name.charAt(0).toUpperCase() + name.slice(1));
+    }
+  }, [user]);
+
+  // Auth kontrolü
+  useEffect(() => {
+    const unsubscribe = auth.onAuthStateChanged((user) => {
+      if (!user) {
+        navigation.reset({
+          index: 0,
+          routes: [{ name: 'login/login' }],
+        });
+      }
+    });
+
+    return () => unsubscribe();
+  }, []);
+
+  // Navigation kontrolü için useEffect
+  useEffect(() => {
+    navigation.setOptions({
+      headerRight: () => (
+        <TouchableOpacity 
+          onPress={() => handleSignOut(navigation)}
+          style={styles.logoutButton}
+        >
+          <Feather name="log-out" size={24} color="#007AFF" />
+        </TouchableOpacity>
+      ),
+      // Geri tuşunu devre dışı bırak
+      headerLeft: () => null,
+      gestureEnabled: false
+    });
+
+    // Geri tuşunu tamamen devre dışı bırak
+    const unsubscribe = navigation.addListener('beforeRemove', (e) => {
+      // Eğer action type 'GO_BACK' ise engelle
+      if (e.data.action.type === 'GO_BACK') {
+        e.preventDefault();
+      }
+    });
+
+    return unsubscribe;
+  }, [navigation]);
 
   const requestBluetoothPermission = async () => {
     if (Platform.OS === 'android') {
@@ -140,6 +194,9 @@ function Connection() {
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.contentContainer}>
+        {userName && (
+          <Text style={styles.welcomeText}>Welcome, {userName}!</Text>
+        )}
         <Text style={styles.title}>Connect Your Device</Text>
         
         <TouchableOpacity 
@@ -176,6 +233,13 @@ function Connection() {
         {scanStatus ? (
           <Text style={styles.statusText}>{scanStatus}</Text>
         ) : null}
+
+        <TouchableOpacity 
+          style={styles.logoutButton}
+          onPress={() => handleSignOut(navigation)}
+        >
+          <Text style={styles.logoutButtonText}>Log Out</Text>
+        </TouchableOpacity>
       </View>
     </SafeAreaView>
   );
@@ -275,6 +339,26 @@ const styles = StyleSheet.create({
     color: '#333333',
     marginTop: 10,
     textAlign: 'center',
+  },
+  welcomeText: {
+    fontSize: 20,
+    color: '#666',
+    marginBottom: 20,
+    textAlign: 'center',
+  },
+  logoutButton: {
+    backgroundColor: '#FF3B30',
+    paddingVertical: 12,
+    paddingHorizontal: 30,
+    borderRadius: 25,
+    marginTop: 20,
+    width: '80%',
+    alignItems: 'center',
+  },
+  logoutButtonText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: 'bold',
   },
 });
 

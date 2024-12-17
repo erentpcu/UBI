@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "632319896086",
+    "project_id": "fevapp-2dffb",
+    "storage_bucket": "fevapp-2dffb.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:632319896086:android:96656efbaf21e049b96337",
+        "android_client_info": {
+          "package_name": "com.anonymous.fev"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyA60YyE1yVfNaQ_h84cXmRsl45fwqpcGsk"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
