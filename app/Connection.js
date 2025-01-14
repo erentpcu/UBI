@@ -8,6 +8,7 @@ import { useNavigation } from '@react-navigation/native';
 import { useSelector } from 'react-redux';
 import VehicleDataScreen from './VehicleDataScreen';
 import ProfileScreen from './ProfileScreen';
+import { ProtectedRoute } from './ProtectedRoute';
 
 const BleManagerModule = NativeModules.BleManager;
 const bleManagerEmitter = new NativeEventEmitter(BleManagerModule);
@@ -507,4 +508,10 @@ const styles = StyleSheet.create({
   },
 });
 
-export default Connection;
+export default function ProtectedConnection() {
+  return (
+    <ProtectedRoute>
+      <Connection />
+    </ProtectedRoute>
+  );
+}

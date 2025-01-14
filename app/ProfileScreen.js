@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { handleSignOut } from './secrets/auth';
 import { useNavigation } from '@react-navigation/native';
 import { useSelector } from 'react-redux';
+import { ProtectedRoute } from './ProtectedRoute';
 
 function ProfileScreen() {
   const navigation = useNavigation();
@@ -56,4 +57,10 @@ const styles = StyleSheet.create({
   },
 });
 
-export default ProfileScreen;
+export default function ProtectedProfileScreen() {
+  return (
+    <ProtectedRoute>
+      <ProfileScreen />
+    </ProtectedRoute>
+  );
+}

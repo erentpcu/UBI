@@ -1,77 +1,52 @@
 import React, { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, FlatList, ActivityIndicator, TouchableOpacity, Alert, TextInput, Modal } from 'react-native';
-import { collection, getDocs, addDoc, deleteDoc, doc, updateDoc } from 'firebase/firestore';
-import { db } from './secrets/auth';
 import { Feather } from '@expo/vector-icons';
+import { useDispatch, useSelector } from 'react-redux';
+import { fetchVehicles, addVehicle, updateVehicle, deleteVehicle } from './store/vehicleSlice';
+import { ProtectedRoute } from './ProtectedRoute';
 
 function VehicleDataScreen() {
-  const [vehicleData, setVehicleData] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const dispatch = useDispatch();
+  const { vehicles, loading, error } = useSelector(state => state.vehicles);
   const [modalVisible, setModalVisible] = useState(false);
   const [editModalVisible, setEditModalVisible] = useState(false);
   const [editingVehicle, setEditingVehicle] = useState(null);
   const [newVehicle, setNewVehicle] = useState({
     colour: '',
-    licence_plate: ''
+    licence_plate: '',
+    attributes: []
   });
 
   useEffect(() => {
-    fetchVehicleData();
-  }, []);
-
-  const fetchVehicleData = async () => {
-    try {
-      const carsCollection = collection(db, 'cars');
-      const querySnapshot = await getDocs(carsCollection);
-      const data = [];
-      
-      querySnapshot.forEach((doc) => {
-        data.push({
-          id: doc.id,
-          ...doc.data()
-        });
-      });
-      
-      setVehicleData(data);
-    } catch (error) {
-      Alert.alert('Error', 'Error fetching vehicle data');
-    } finally {
-      setLoading(false);
-    }
-  };
+    dispatch(fetchVehicles());
+  }, [dispatch]);
 
   const handleAddVehicle = async () => {
     try {
-      setLoading(true);
-      const carsCollection = collection(db, 'cars');
-      await addDoc(carsCollection, newVehicle);
+      await dispatch(addVehicle(newVehicle)).unwrap();
       setModalVisible(false);
-      setNewVehicle({ colour: '', licence_plate: '' });
-      await fetchVehicleData();
+      setNewVehicle({ colour: '', licence_plate: '', attributes: [] });
       Alert.alert('Success', 'Vehicle added successfully');
     } catch (error) {
-      Alert.alert('Error', 'Error adding vehicle');
-    } finally {
-      setLoading(false);
+      Alert.alert('Error', error);
     }
   };
 
   const handleUpdateVehicle = async () => {
     try {
-      setLoading(true);
-      const vehicleRef = doc(db, 'cars', editingVehicle.id);
-      await updateDoc(vehicleRef, {
-        colour: editingVehicle.colour,
-        licence_plate: editingVehicle.licence_plate
-      });
+      await dispatch(updateVehicle({
+        id: editingVehicle.id,
+        data: {
+          colour: editingVehicle.colour,
+          licence_plate: editingVehicle.licence_plate,
+          attributes: editingVehicle.attributes || []
+        }
+      })).unwrap();
       setEditModalVisible(false);
       setEditingVehicle(null);
-      await fetchVehicleData();
       Alert.alert('Success', 'Vehicle updated successfully');
     } catch (error) {
-      Alert.alert('Error', 'Error updating vehicle');
-    } finally {
-      setLoading(false);
+      Alert.alert('Error', error);
     }
   };
 
@@ -86,21 +61,124 @@ function VehicleDataScreen() {
           style: 'destructive',
           onPress: async () => {
             try {
-              setLoading(true);
-              const vehicleRef = doc(db, 'cars', id);
-              await deleteDoc(vehicleRef);
-              await fetchVehicleData();
+              await dispatch(deleteVehicle(id)).unwrap();
               Alert.alert('Success', 'Vehicle deleted successfully');
             } catch (error) {
-              Alert.alert('Error', 'Error deleting vehicle');
-            } finally {
-              setLoading(false);
+              Alert.alert('Error', error);
             }
           }
         }
       ]
     );
   };
+
+  const addNewAttribute = (isEdit = false) => {
+    if (isEdit) {
+      setEditingVehicle({
+        ...editingVehicle,
+        attributes: [...(editingVehicle.attributes || []), { key: '', value: '' }]
+      });
+    } else {
+      setNewVehicle({
+        ...newVehicle,
+        attributes: [...newVehicle.attributes, { key: '', value: '' }]
+      });
+    }
+  };
+
+  const updateAttribute = (index, field, value, isEdit = false) => {
+    if (isEdit) {
+      const updatedAttributes = [...(editingVehicle.attributes || [])];
+      updatedAttributes[index] = {
+        ...updatedAttributes[index],
+        [field]: value
+      };
+      setEditingVehicle({
+        ...editingVehicle,
+        attributes: updatedAttributes
+      });
+    } else {
+      const updatedAttributes = [...newVehicle.attributes];
+      updatedAttributes[index] = {
+        ...updatedAttributes[index],
+        [field]: value
+      };
+      setNewVehicle({
+        ...newVehicle,
+        attributes: updatedAttributes
+      });
+    }
+  };
+
+  const removeAttribute = (index, isEdit = false) => {
+    if (isEdit) {
+      const updatedAttributes = editingVehicle.attributes.filter((_, i) => i !== index);
+      setEditingVehicle({
+        ...editingVehicle,
+        attributes: updatedAttributes
+      });
+    } else {
+      const updatedAttributes = newVehicle.attributes.filter((_, i) => i !== index);
+      setNewVehicle({
+        ...newVehicle,
+        attributes: updatedAttributes
+      });
+    }
+  };
+
+  const renderAttributeInputs = (attributes, isEdit = false) => {
+    return (
+      <View style={styles.attributesContainer}>
+        <View style={styles.attributesHeader}>
+          <Text style={styles.attributesTitle}>Custom Attributes</Text>
+          <TouchableOpacity 
+            style={styles.addAttributeButton}
+            onPress={() => addNewAttribute(isEdit)}
+          >
+            <Feather name="plus" size={20} color="#007AFF" />
+            <Text style={styles.addAttributeText}>Add Attribute</Text>
+          </TouchableOpacity>
+        </View>
+
+        {attributes.map((attr, index) => (
+          <View key={index} style={styles.attributeRow}>
+            <TextInput
+              style={[styles.input, styles.attributeInput]}
+              placeholder="Attribute Name"
+              value={attr.key}
+              onChangeText={(text) => updateAttribute(index, 'key', text, isEdit)}
+            />
+            <TextInput
+              style={[styles.input, styles.attributeInput]}
+              placeholder="Value"
+              value={attr.value}
+              onChangeText={(text) => updateAttribute(index, 'value', text, isEdit)}
+            />
+            <TouchableOpacity 
+              onPress={() => removeAttribute(index, isEdit)}
+              style={styles.removeAttributeButton}
+            >
+              <Feather name="x" size={20} color="#FF3B30" />
+            </TouchableOpacity>
+          </View>
+        ))}
+      </View>
+    );
+  };
+
+  const openEditModal = (vehicle) => {
+    setEditingVehicle({
+      ...vehicle,
+      attributes: vehicle.attributes || []
+    });
+    setEditModalVisible(true);
+  };
+
+  const EmptyListMessage = () => (
+    <View style={styles.emptyContainer}>
+      <Text style={styles.emptyText}>No vehicles added yet</Text>
+    </View>
+  );
 
   if (loading) {
     return (
@@ -121,7 +199,7 @@ function VehicleDataScreen() {
       </TouchableOpacity>
 
       <FlatList
-        data={vehicleData}
+        data={vehicles}
         keyExtractor={(item) => item.id}
         renderItem={({ item }) => (
           <View style={styles.dataCard}>
@@ -129,10 +207,7 @@ function VehicleDataScreen() {
               <Text style={styles.dataTitle}>Vehicle Information</Text>
               <View style={styles.actionButtons}>
                 <TouchableOpacity 
-                  onPress={() => {
-                    setEditingVehicle(item);
-                    setEditModalVisible(true);
-                  }}
+                  onPress={() => openEditModal(item)}
                   style={styles.editButton}
                 >
                   <Feather name="edit" size={20} color="#007AFF" />
@@ -145,20 +220,40 @@ function VehicleDataScreen() {
                 </TouchableOpacity>
               </View>
             </View>
-            <View style={styles.dataRow}>
-              <Text style={styles.dataLabel}>Color:</Text>
-              <Text style={styles.dataValue}>
+
+  
+
+
+          {item.colour?.trim() && 
+          <View style={styles.dataRow}>
+                <Text style={styles.dataLabel}>Color:</Text>
+                <Text style={styles.dataValue}>
                 {item.colour?.trim() || "Not entered"}
               </Text>
-            </View>
-            <View style={styles.dataRow}>
-              <Text style={styles.dataLabel}>License Plate:</Text>
+            </View> }
+            
+              
+
+          {item.icence_plate?.trim()  && <View style={styles.dataRow}> <Text style={styles.dataLabel}>License Plate:</Text>
               <Text style={styles.dataValue}>
                 {item.licence_plate?.trim() || "Not entered"}
               </Text>
-            </View>
+            </View>}
+
+
+
+            
+    
+            {item.attributes?.map((attr, index) => 
+              {attr?.value && <View key={index} style={styles.dataRow}>
+                <Text style={styles.dataLabel}>{attr.key}:</Text>
+                <Text style={styles.dataValue}>{attr.value || "Not entered"}</Text>
+              </View>}
+            )}
           </View>
         )}
+        ListEmptyComponent={EmptyListMessage}
+        contentContainerStyle={vehicles.length === 0 ? styles.emptyList : null}
       />
 
       {/* Add Vehicle Modal */}
@@ -182,10 +277,14 @@ function VehicleDataScreen() {
               value={newVehicle.licence_plate}
               onChangeText={(text) => setNewVehicle({...newVehicle, licence_plate: text})}
             />
+            {renderAttributeInputs(newVehicle.attributes)}
             <View style={styles.modalButtons}>
               <TouchableOpacity 
                 style={[styles.modalButton, styles.cancelButton]}
-                onPress={() => setModalVisible(false)}
+                onPress={() => {
+                  setModalVisible(false);
+                  setNewVehicle({ colour: '', licence_plate: '', attributes: [] });
+                }}
               >
                 <Text style={styles.buttonText}>Cancel</Text>
               </TouchableOpacity>
@@ -221,6 +320,7 @@ function VehicleDataScreen() {
               value={editingVehicle?.licence_plate}
               onChangeText={(text) => setEditingVehicle({...editingVehicle, licence_plate: text})}
             />
+            {renderAttributeInputs(editingVehicle?.attributes || [], true)}
             <View style={styles.modalButtons}>
               <TouchableOpacity 
                 style={[styles.modalButton, styles.cancelButton]}
@@ -360,6 +460,64 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontWeight: 'bold',
   },
+  attributesContainer: {
+    marginTop: 10,
+  },
+  attributesHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 10,
+  },
+  attributesTitle: {
+    fontSize: 16,
+    fontWeight: '500',
+    color: '#666',
+  },
+  addAttributeButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 5,
+  },
+  addAttributeText: {
+    color: '#007AFF',
+    marginLeft: 5,
+    fontSize: 14,
+  },
+  attributeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 10,
+  },
+  attributeInput: {
+    flex: 1,
+    marginRight: 10,
+    marginBottom: 0,
+  },
+  removeAttributeButton: {
+    padding: 5,
+  },
+  emptyContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingVertical: 50
+  },
+  emptyText: {
+    fontSize: 16,
+    color: '#666',
+    fontStyle: 'italic'
+  },
+  emptyList: {
+    flex: 1,
+    justifyContent: 'center'
+  }
 });
 
-export default VehicleDataScreen;
+export default function ProtectedVehicleDataScreen() {
+  return (
+    <ProtectedRoute>
+      <VehicleDataScreen />
+    </ProtectedRoute>
+  );
+}
