@@ -6,12 +6,15 @@ import { NativeEventEmitter, NativeModules, PermissionsAndroid } from 'react-nat
 import { auth, handleSignOut } from './secrets/auth';
 import { useNavigation } from '@react-navigation/native';
 import { useSelector } from 'react-redux';
+import VehicleDataScreen from './VehicleDataScreen';
+import ProfileScreen from './ProfileScreen';
 
 const BleManagerModule = NativeModules.BleManager;
 const bleManagerEmitter = new NativeEventEmitter(BleManagerModule);
 
 function Connection() {
   const navigation = useNavigation();
+  const [currentScreen, setCurrentScreen] = useState('bluetooth'); // 'bluetooth', 'vehicle' veya 'profile'
   const [isScanning, setIsScanning] = useState(false);
   const [devices, setDevices] = useState([]);
   const [isBluetoothReady, setIsBluetoothReady] = useState(false);
@@ -44,12 +47,17 @@ function Connection() {
   useEffect(() => {
     navigation.setOptions({
       headerRight: () => (
-        <TouchableOpacity 
-          onPress={() => handleSignOut(navigation)}
-          style={styles.logoutButton}
-        >
-          <Feather name="log-out" size={24} color="#007AFF" />
-        </TouchableOpacity>
+        <View style={styles.headerLogoutContainer}>
+          <Text style={styles.headerLogoutText}>
+            Logout {userName}
+          </Text>
+          <TouchableOpacity 
+            onPress={() => handleSignOut(navigation)}
+            style={styles.logoutButton}
+          >
+            <Feather name="log-out" size={24} color="#007AFF" />
+          </TouchableOpacity>
+        </View>
       ),
       // Geri tuşunu devre dışı bırak
       headerLeft: () => null,
@@ -65,7 +73,7 @@ function Connection() {
     });
 
     return unsubscribe;
-  }, [navigation]);
+  }, [navigation, userName]);
 
   const requestBluetoothPermission = async () => {
     if (Platform.OS === 'android') {
@@ -191,173 +199,310 @@ function Connection() {
     }
   };
 
-  return (
-    <SafeAreaView style={styles.container}>
-      <View style={styles.contentContainer}>
-        {userName && (
-          <Text style={styles.welcomeText}>Welcome, {userName}!</Text>
-        )}
-        <Text style={styles.title}>Connect Your Device</Text>
-        
-        <TouchableOpacity 
-          style={[styles.scanButton, (!isBluetoothReady || isScanning) && styles.disabledButton]} 
-          onPress={scanAndConnect}
-          disabled={!isBluetoothReady || isScanning}
-        >
-          <Image
-            source={require('../app/bluetooth.gif')}
-            style={styles.bluetoothIcon}
-          />
-        </TouchableOpacity>
-        
-        {isScanning && <Text style={styles.scanningText}>Scanning...</Text>}
-        {!isBluetoothReady && <Text style={styles.scanningText}>Initializing Bluetooth...</Text>}
-        
-        {devices.length > 0 && (
-          <View style={styles.deviceList}>
-            <Text style={styles.deviceListTitle}>Available Devices:</Text>
-            {devices.map((device, index) => (
+  const renderScreen = () => {
+    switch(currentScreen) {
+      case 'vehicle':
+        return <VehicleDataScreen />;
+      case 'profile':
+        return <ProfileScreen />;
+      default:
+        return (
+          <View style={styles.container}>
+            <View style={styles.header}>
+              <Text style={styles.welcomeText}>Welcome, {userName}!</Text>
+              <Text style={styles.title}>Connect Your Device</Text>
+            </View>
+            
+            <View style={styles.mainContent}>
               <TouchableOpacity 
-                key={index} 
-                style={styles.deviceButton}
-                onPress={() => connectToDevice(device)}
+                style={[styles.scanButton, (!isBluetoothReady || isScanning) && styles.disabledButton]} 
+                onPress={scanAndConnect}
+                disabled={!isBluetoothReady || isScanning}
               >
-                <Text style={styles.deviceButtonText}>
-                  {device.name || 'OBD2 Cihazı'} ({device.id})
-                </Text>
+                <Image
+                  source={require('../app/bluetooth.gif')}
+                  style={styles.bluetoothIcon}
+                  resizeMode="contain"
+                />
               </TouchableOpacity>
-            ))}
+              
+              <View style={styles.statusContainer}>
+                {isScanning && <Text style={styles.scanningText}>Scanning...</Text>}
+                {!isBluetoothReady && <Text style={styles.scanningText}>Bluetooth başlatılıyor...</Text>}
+                <Text style={styles.statusText}>{scanStatus}</Text>
+              </View>
+              
+              {devices.length > 0 && (
+                <View style={styles.deviceList}>
+                  <Text style={styles.deviceListTitle}>Available Devices:</Text>
+                  {devices.map((device, index) => (
+                    <TouchableOpacity 
+                      key={index} 
+                      style={styles.deviceButton}
+                      onPress={() => connectToDevice(device)}
+                    >
+                      <Text style={styles.deviceButtonText}>
+                        {device.name || 'OBD2 Device'} ({device.id})
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              )}
+            </View>
           </View>
-        )}
-        
-        {scanStatus ? (
-          <Text style={styles.statusText}>{scanStatus}</Text>
-        ) : null}
+        );
+    }
+  };
 
-        <TouchableOpacity 
-          style={styles.logoutButton}
-          onPress={() => handleSignOut(navigation)}
-        >
-          <Text style={styles.logoutButtonText}>Log Out</Text>
-        </TouchableOpacity>
+  return (
+    <View style={styles.mainContainer}>
+      {/* Main Content */}
+      {renderScreen()}
+
+      {/* Bottom Navigation */}
+      <View style={styles.bottomContainer}>
+        <View style={styles.navButtons}>
+          <TouchableOpacity 
+            style={[
+              styles.navButton, 
+              currentScreen === 'bluetooth' && styles.activeNavButton
+            ]}
+            onPress={() => setCurrentScreen('bluetooth')}
+          >
+            <Feather 
+              name="bluetooth" 
+              size={20} 
+              color={currentScreen === 'bluetooth' ? '#007AFF' : '#666'} 
+            />
+            <Text style={[
+              styles.navButtonText,
+              currentScreen === 'bluetooth' && styles.activeNavText
+            ]}>
+              Connect
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity 
+            style={[
+              styles.navButton, 
+              currentScreen === 'vehicle' && styles.activeNavButton
+            ]}
+            onPress={() => setCurrentScreen('vehicle')}
+          >
+            <Feather 
+              name="database" 
+              size={20} 
+              color={currentScreen === 'vehicle' ? '#007AFF' : '#666'} 
+            />
+            <Text style={[
+              styles.navButtonText,
+              currentScreen === 'vehicle' && styles.activeNavText
+            ]}>
+              Vehicle
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity 
+            style={[
+              styles.navButton, 
+              currentScreen === 'profile' && styles.activeNavButton
+            ]}
+            onPress={() => setCurrentScreen('profile')}
+          >
+            <Feather 
+              name="user" 
+              size={20} 
+              color={currentScreen === 'profile' ? '#007AFF' : '#666'} 
+            />
+            <Text style={[
+              styles.navButtonText,
+              currentScreen === 'profile' && styles.activeNavText
+            ]}>
+              Profile
+            </Text>
+          </TouchableOpacity>
+        </View>
       </View>
-    </SafeAreaView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  gifImage: {
-    width: 200,
-    height: 200,
-    marginBottom: 50,
-  },
   container: {
     flex: 1,
     backgroundColor: '#FFFFFF',
   },
-  contentContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
+  header: {
+    width: '100%',
     paddingHorizontal: 20,
+    paddingVertical: 10,
+    backgroundColor: '#F8F9FA',
+  },
+  mainContent: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 20,
+  },
+  welcomeText: {
+    fontSize: 24,
+    color: '#333333',
+    fontWeight: '500',
+    marginBottom: 8,
   },
   title: {
-    fontSize: 24,
+    fontSize: 28,
     fontWeight: 'bold',
-    marginBottom: 30,
     color: '#333333',
-    marginBottom: 75,
-  },
-  deviceIconContainer: {
-    marginBottom: 30,
-  },
-  button: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#F0F8FF',
-    paddingVertical: 15,
-    paddingHorizontal: 20,
-    borderRadius: 10,
-    marginBottom: 15,
-    width: '100%',
-  },
-  iconCircle: {
-    width: 30,
-    height: 30,
-    borderRadius: 15,
-    backgroundColor: '#007AFF',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 10,
-  },
-  buttonText: {
-    fontSize: 16,
-    color: '#007AFF',
-  },
-  disabledButton: {
-    opacity: 0.5,
-  },
-  deviceList: {
-    width: '100%',
-    marginTop: 20,
-  },
-  deviceListTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    marginBottom: 10,
-  },
-  deviceButton: {
-    backgroundColor: '#F0F8FF',
-    padding: 10,
-    borderRadius: 5,
-    marginBottom: 5,
-  },
-  deviceButtonText: {
-    fontSize: 14,
-    color: '#007AFF',
   },
   scanButton: {
-    width: 100,
-    height: 100,
+    width: 160,
+    height: 160,
     justifyContent: 'center',
     alignItems: 'center',
     backgroundColor: '#F0F8FF',
-    borderRadius: 50,
+    borderRadius: 80,
     marginBottom: 20,
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+    elevation: 5,
   },
   bluetoothIcon: {
     width: 120,
     height: 120,
   },
-  scanningText: {
-    fontSize: 16,
-    color: '#007AFF',
+  statusContainer: {
+    alignItems: 'center',
     marginBottom: 20,
+  },
+  scanningText: {
+    fontSize: 18,
+    color: '#007AFF',
+    marginBottom: 8,
   },
   statusText: {
     fontSize: 16,
-    color: '#333333',
-    marginTop: 10,
-    textAlign: 'center',
+    color: '#666666',
   },
-  welcomeText: {
-    fontSize: 20,
-    color: '#666',
-    marginBottom: 20,
-    textAlign: 'center',
+  deviceList: {
+    width: '100%',
+    flex: 1,
+  },
+  deviceListTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    marginBottom: 10,
+    color: '#333333',
+  },
+  deviceButton: {
+    backgroundColor: '#F0F8FF',
+    padding: 15,
+    borderRadius: 10,
+    marginBottom: 8,
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 1,
+    },
+    shadowOpacity: 0.2,
+    shadowRadius: 1.41,
+    elevation: 2,
+  },
+  deviceButtonText: {
+    fontSize: 16,
+    color: '#007AFF',
+    fontWeight: '500',
+  },
+  footer: {
+    padding: 20,
+    backgroundColor: '#F8F9FA',
   },
   logoutButton: {
     backgroundColor: '#FF3B30',
-    paddingVertical: 12,
-    paddingHorizontal: 30,
+    paddingVertical: 15,
     borderRadius: 25,
-    marginTop: 20,
-    width: '80%',
     alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+    elevation: 5,
   },
   logoutButtonText: {
     color: '#FFFFFF',
     fontSize: 16,
+    fontWeight: 'bold',
+  },
+  headerLogoutContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingRight: 15,
+  },
+  headerLogoutText: {
+    color: '#007AFF',
+    marginRight: 8,
+    fontSize: 16,
+  },
+  disabledButton: {
+    opacity: 0.6,
+  },
+  mainContainer: {
+    flex: 1,
+    backgroundColor: '#fff',
+  },
+  bottomContainer: {
+    padding: 15,
+    backgroundColor: '#F8F9FA',
+    borderTopWidth: 1,
+    borderTopColor: '#E8E8E8',
+  },
+  navButtons: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  navButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 10,
+    borderRadius: 8,
+    flex: 1,
+    marginHorizontal: 5,
+    backgroundColor: '#fff',
+    borderWidth: 1,
+    borderColor: '#E8E8E8',
+    justifyContent: 'center',
+  },
+  activeNavButton: {
+    backgroundColor: '#E8F2FF',
+    borderColor: '#007AFF',
+  },
+  navButtonText: {
+    marginLeft: 8,
+    color: '#666',
+    fontSize: 14,
+    fontWeight: '500',
+  },
+  activeNavText: {
+    color: '#007AFF',
+    fontWeight: 'bold',
+  },
+  logoutButton: {
+    backgroundColor: '#FF3B30',
+    padding: 12,
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  logoutButtonText: {
+    color: '#fff',
+    fontSize: 14,
     fontWeight: 'bold',
   },
 });

@@ -8,6 +8,7 @@ import {
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { store } from '../store';
 import { setUser, logout } from '../store/authSlice';
+import { getFirestore } from 'firebase/firestore';
 
 const firebaseConfig = {
   apiKey: "AIzaSyAfkwv0CsfzXkgHDS1tcYXGkEptxjLaUhM",
@@ -24,6 +25,8 @@ const app = initializeApp(firebaseConfig);
 const auth = initializeAuth(app, {
   persistence: getReactNativePersistence(AsyncStorage)
 });
+
+const db = getFirestore(app);
 
 export const subscribeToAuthChanges = (callback) => {
   return onAuthStateChanged(auth, (user) => {
@@ -43,4 +46,4 @@ export const handleSignOut = async (navigation) => {
   }
 };
 
-export { auth, app };
+export { auth, app, db };

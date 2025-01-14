@@ -1,7 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { View, Image, Text, TextInput, TouchableOpacity, ActivityIndicator, Alert } from 'react-native';
 import { Feather } from '@expo/vector-icons';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { useDispatch, useSelector } from 'react-redux';
 import { loginUser, clearError } from '../store/authSlice';
 import { styles } from '../../App.styles';
@@ -16,8 +16,20 @@ function Login() {
     const [emailError, setEmailError] = useState(false);
     const [passwordError, setPasswordError] = useState(false);
 
+    useFocusEffect(
+        useCallback(() => {
+            setUsername('');
+            setPassword('');
+            setEmailError(false);
+            setPasswordError(false);
+            
+            if (dispatch && clearError) {
+                dispatch(clearError());
+            }
+        }, [])
+    );
+
     useEffect(() => {
-       
         if (user) {
             navigation.navigate('Connection');
         }
