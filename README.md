@@ -72,7 +72,7 @@ A React Native application for managing vehicle data with custom attributes. Thi
 - React Native Elements
 
 ## Installation
-
+If npm's are giving an error try npx instead.
 1. Clone the repository,
 ```bash
 git clone https://github.com/your-username/your-repo-name.git
