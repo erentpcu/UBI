@@ -28,25 +28,50 @@ function VehicleDataScreen() {
       setNewVehicle({ colour: '', licence_plate: '', attributes: [] });
       Alert.alert('Success', 'Vehicle added successfully');
     } catch (error) {
-      Alert.alert('Error', error);
+      console.error('Add Vehicle Error:', error); // Detaylı hata bilgisi
+      Alert.alert('Error', `Failed to add vehicle: ${error}`);
     }
   };
 
   const handleUpdateVehicle = async () => {
     try {
+      const currentAttributes = [...(editingVehicle.attributes || [])];
+      
+      // Device ID ve Name attributelerini bul
+      const deviceIdAttr = currentAttributes.find(attr => attr.key === 'Device ID');
+      const deviceNameAttr = currentAttributes.find(attr => attr.key === 'Device Name');
+      
+      // Diğer attributeleri filtrele
+      const otherAttributes = currentAttributes.filter(attr => 
+        attr.key !== 'Device ID' && attr.key !== 'Device Name'
+      );
+
+      // Güncellenmiş veriyi hazırla
+      const updateData = {
+        ...editingVehicle,
+        // Sadece attribute'da varsa deviceId ve name'i ekle
+        ...(deviceIdAttr ? { deviceId: deviceIdAttr.value } : { deviceId: null }),
+        ...(deviceNameAttr ? { name: deviceNameAttr.value } : { name: null }),
+        attributes: otherAttributes
+      };
+
+      // id'yi updateData'dan çıkar
+      const { id, ...dataToUpdate } = updateData;
+
       await dispatch(updateVehicle({
         id: editingVehicle.id,
-        data: {
-          colour: editingVehicle.colour,
-          licence_plate: editingVehicle.licence_plate,
-          attributes: editingVehicle.attributes || []
-        }
+        data: dataToUpdate
       })).unwrap();
+      
       setEditModalVisible(false);
       setEditingVehicle(null);
       Alert.alert('Success', 'Vehicle updated successfully');
+      
+      // Güncel listeyi getir
+      dispatch(fetchVehicles());
     } catch (error) {
-      Alert.alert('Error', error);
+      console.error('Update Error:', error);
+      Alert.alert('Error', error.toString());
     }
   };
 
@@ -112,12 +137,30 @@ function VehicleDataScreen() {
 
   const removeAttribute = (index, isEdit = false) => {
     if (isEdit) {
-      const updatedAttributes = editingVehicle.attributes.filter((_, i) => i !== index);
-      setEditingVehicle({
-        ...editingVehicle,
-        attributes: updatedAttributes
-      });
+      const attributeToRemove = editingVehicle.attributes[index];
+      
+      // Device ID veya Device Name siliniyorsa, ana objeden de sil
+      if (attributeToRemove.key === 'Device ID' || attributeToRemove.key === 'Device Name') {
+        const updatedVehicle = { ...editingVehicle };
+        if (attributeToRemove.key === 'Device ID') {
+          delete updatedVehicle.deviceId;
+        }
+        if (attributeToRemove.key === 'Device Name') {
+          delete updatedVehicle.name;
+        }
+        // Attributes'dan da kaldır
+        updatedVehicle.attributes = editingVehicle.attributes.filter((_, i) => i !== index);
+        setEditingVehicle(updatedVehicle);
+      } else {
+        // Normal attribute silme işlemi
+        const updatedAttributes = editingVehicle.attributes.filter((_, i) => i !== index);
+        setEditingVehicle({
+          ...editingVehicle,
+          attributes: updatedAttributes
+        });
+      }
     } else {
+      // Yeni araç ekleme modunda silme işlemi
       const updatedAttributes = newVehicle.attributes.filter((_, i) => i !== index);
       setNewVehicle({
         ...newVehicle,
@@ -167,9 +210,24 @@ function VehicleDataScreen() {
   };
 
   const openEditModal = (vehicle) => {
+    // Mevcut attributeleri kopyala
+    const currentAttributes = [...(vehicle.attributes || [])];
+    
+    // Device ID ve Name'i attributes içinde var mı kontrol et
+    const hasDeviceId = currentAttributes.some(attr => attr.key === 'Device ID');
+    const hasDeviceName = currentAttributes.some(attr => attr.key === 'Device Name');
+
+    // Sadece eksik olanları ekle
+    if (vehicle.deviceId && !hasDeviceId) {
+      currentAttributes.push({ key: 'Device ID', value: vehicle.deviceId });
+    }
+    if (vehicle.name && !hasDeviceName) {
+      currentAttributes.push({ key: 'Device Name', value: vehicle.name });
+    }
+
     setEditingVehicle({
       ...vehicle,
-      attributes: vehicle.attributes || []
+      attributes: currentAttributes
     });
     setEditModalVisible(true);
   };
@@ -221,35 +279,29 @@ function VehicleDataScreen() {
               </View>
             </View>
 
-  
-
-
-          {item.colour?.trim() && 
-          <View style={styles.dataRow}>
-                <Text style={styles.dataLabel}>Color:</Text>
-                <Text style={styles.dataValue}>
-                {item.colour?.trim() || "Not entered"}
-              </Text>
-            </View> }
-            
-              
-
-          {item.icence_plate?.trim()  && <View style={styles.dataRow}> <Text style={styles.dataLabel}>License Plate:</Text>
-              <Text style={styles.dataValue}>
-                {item.licence_plate?.trim() || "Not entered"}
-              </Text>
-            </View>}
-
-
-
-            
-    
-            {item.attributes?.map((attr, index) => 
-              {attr?.value && <View key={index} style={styles.dataRow}>
-                <Text style={styles.dataLabel}>{attr.key}:</Text>
-                <Text style={styles.dataValue}>{attr.value || "Not entered"}</Text>
-              </View>}
+            {/* Device ID ve Name'i göster */}
+            {item.deviceId && (
+              <View style={styles.dataRow}>
+                <Text style={styles.dataLabel}>Device ID:</Text>
+                <Text style={styles.dataValue}>{item.deviceId}</Text>
+              </View>
             )}
+            {item.name && (
+              <View style={styles.dataRow}>
+                <Text style={styles.dataLabel}>Device Name:</Text>
+                <Text style={styles.dataValue}>{item.name}</Text>
+              </View>
+            )}
+
+            {/* Diğer attributeleri göster */}
+            {Array.isArray(item.attributes) && item.attributes.map((attr, index) => (
+              attr && attr.key && attr.key !== 'Device ID' && attr.key !== 'Device Name' && (
+                <View key={index} style={styles.dataRow}>
+                  <Text style={styles.dataLabel}>{attr.key}:</Text>
+                  <Text style={styles.dataValue}>{attr.value || "Not Specified"}</Text>
+                </View>
+              )
+            ))}
           </View>
         )}
         ListEmptyComponent={EmptyListMessage}
@@ -265,18 +317,7 @@ function VehicleDataScreen() {
         <View style={styles.modalContainer}>
           <View style={styles.modalContent}>
             <Text style={styles.modalTitle}>Add New Vehicle</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="Color"
-              value={newVehicle.colour}
-              onChangeText={(text) => setNewVehicle({...newVehicle, colour: text})}
-            />
-            <TextInput
-              style={styles.input}
-              placeholder="License Plate"
-              value={newVehicle.licence_plate}
-              onChangeText={(text) => setNewVehicle({...newVehicle, licence_plate: text})}
-            />
+          
             {renderAttributeInputs(newVehicle.attributes)}
             <View style={styles.modalButtons}>
               <TouchableOpacity 
@@ -308,18 +349,7 @@ function VehicleDataScreen() {
         <View style={styles.modalContainer}>
           <View style={styles.modalContent}>
             <Text style={styles.modalTitle}>Edit Vehicle</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="Color"
-              value={editingVehicle?.colour}
-              onChangeText={(text) => setEditingVehicle({...editingVehicle, colour: text})}
-            />
-            <TextInput
-              style={styles.input}
-              placeholder="License Plate"
-              value={editingVehicle?.licence_plate}
-              onChangeText={(text) => setEditingVehicle({...editingVehicle, licence_plate: text})}
-            />
+            
             {renderAttributeInputs(editingVehicle?.attributes || [], true)}
             <View style={styles.modalButtons}>
               <TouchableOpacity 

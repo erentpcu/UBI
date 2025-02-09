@@ -20,7 +20,8 @@ export const fetchVehicles = createAsyncThunk(
       
       return vehicles;
     } catch (error) {
-      return rejectWithValue('Error fetching vehicles');
+      console.error('Firebase Error:', error);
+      return rejectWithValue(error.message || 'Error fetching vehicles');
     }
   }
 );
@@ -33,7 +34,8 @@ export const addVehicle = createAsyncThunk(
       const docRef = await addDoc(carsCollection, vehicleData);
       return { id: docRef.id, ...vehicleData };
     } catch (error) {
-      return rejectWithValue('Error adding vehicle');
+      console.error('Firebase Error:', error);
+      return rejectWithValue(error.message || 'Error adding vehicle');
     }
   }
 );
@@ -46,7 +48,8 @@ export const updateVehicle = createAsyncThunk(
       await updateDoc(vehicleRef, data);
       return { id, ...data };
     } catch (error) {
-      return rejectWithValue('Error updating vehicle');
+      console.error('Update Error:', error);
+      return rejectWithValue(error.message || 'Error updating vehicle');
     }
   }
 );
@@ -126,7 +129,11 @@ const vehicleSlice = createSlice({
         state.status = 'fulfilled';
         const index = state.vehicles.findIndex(v => v.id === action.payload.id);
         if (index !== -1) {
-          state.vehicles[index] = action.payload;
+          state.vehicles[index] = {
+            ...state.vehicles[index],
+            ...action.payload,
+            attributes: action.payload.attributes || []
+          };
         }
       })
       .addCase(updateVehicle.rejected, (state, action) => {

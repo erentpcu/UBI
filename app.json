@@ -11,7 +11,8 @@
           ],
           "bluetoothAlwaysPermission": "Allow $(PRODUCT_NAME) to connect to bluetooth devices"
         }
-      ]
+      ],
+      "react-native-ble-manager"
     ],
     "name": "fev",
     "slug": "fev",
